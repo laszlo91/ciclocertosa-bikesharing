@@ -1,0 +1,10 @@
+secrets/
+*.env
+__pycache__/
+_bmad/
+_bmad-output/
+.agents
+.venv/
+docs/
+.claude/
+.github/
