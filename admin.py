@@ -9,15 +9,22 @@ Avvio:
 """
 import os
 import secrets as _secrets
+import shutil
 import sqlite3
-from typing import Annotated
+import uuid
+from pathlib import Path
+from typing import Annotated, Optional
 
 from dotenv import dotenv_values
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 import db
+
+ASSETS_DIR = Path(__file__).parent / "assets"
+_ALLOWED_IMG_CONTENT_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_ALLOWED_IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 # ---------------------------------------------------------------------------
 # Credenziali admin
@@ -119,10 +126,36 @@ def list_bikes(_: Auth) -> list[dict]:
 
 
 @app.post("/bikes", status_code=status.HTTP_201_CREATED, summary="Aggiungi bici")
-def add_bike(body: BikeCreate, _: Auth) -> dict:
-    """Inserisce una nuova bici con status='available'."""
-    new_id = db.add_bike(label=body.label, unlock_code=body.unlock_code)
-    return {"id": new_id, "label": body.label, "unlock_code": body.unlock_code, "status": "available"}
+async def add_bike(
+    _: Auth,
+    label: str = Form(..., min_length=1, description="Nome/etichetta della bici"),
+    unlock_code: str = Form(..., min_length=1, description="Codice del catenaccio"),
+    photo: Optional[UploadFile] = File(None, description="Foto della bici (opzionale; jpg/png/gif/webp)"),
+) -> dict:
+    """Inserisce una nuova bici con status='available'. La foto e' opzionale."""
+    photo_filename: Optional[str] = None
+    if photo and photo.filename:
+        content_type = photo.content_type or ""
+        if content_type not in _ALLOWED_IMG_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Il file caricato non e' un'immagine valida. Usa jpg, png, gif o webp.",
+            )
+        ext = Path(photo.filename).suffix.lower()
+        if ext not in _ALLOWED_IMG_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Estensione '{ext}' non supportata. Usa jpg, png, gif o webp.",
+            )
+        ASSETS_DIR.mkdir(exist_ok=True)
+        safe_name = f"{uuid.uuid4().hex}{ext}"
+        dest = ASSETS_DIR / safe_name
+        with dest.open("wb") as buf:
+            shutil.copyfileobj(photo.file, buf)
+        photo_filename = safe_name
+
+    new_id = db.add_bike(label=label, unlock_code=unlock_code, photo_url=photo_filename)
+    return {"id": new_id, "label": label, "unlock_code": unlock_code, "status": "available", "photo_url": photo_filename}
 
 
 @app.delete("/bikes/{bike_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Rimuovi bici")

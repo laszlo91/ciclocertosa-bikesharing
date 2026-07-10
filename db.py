@@ -34,7 +34,8 @@ def init_db() -> None:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 label       TEXT NOT NULL,
                 status      TEXT NOT NULL CHECK(status IN ('available', 'unavailable')),
-                unlock_code TEXT NOT NULL
+                unlock_code TEXT NOT NULL,
+                photo_url   TEXT
             );
 
             CREATE TABLE IF NOT EXISTS bookings (
@@ -52,6 +53,12 @@ def init_db() -> None:
                 first_seen_at DATETIME NOT NULL
             );
         """)
+        # Migrazione: aggiunge photo_url alle installazioni esistenti
+        try:
+            conn.execute("ALTER TABLE bikes ADD COLUMN photo_url TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # colonna già presente
         conn.commit()
 
 
@@ -59,7 +66,7 @@ def get_available_bikes() -> list[sqlite3.Row]:
     """Restituisce tutte le bici con status='available'."""
     with _get_conn() as conn:
         return conn.execute(
-            "SELECT id, label FROM bikes WHERE status = 'available' ORDER BY id"
+            "SELECT id, label, photo_url FROM bikes WHERE status = 'available' ORDER BY id"
         ).fetchall()
 
 
@@ -67,7 +74,7 @@ def get_bike_by_id(bike_id: int) -> Optional[sqlite3.Row]:
     """Restituisce la bici con l'id dato, o None se non esiste."""
     with _get_conn() as conn:
         return conn.execute(
-            "SELECT id, label, status, unlock_code FROM bikes WHERE id = ?",
+            "SELECT id, label, status, unlock_code, photo_url FROM bikes WHERE id = ?",
             (bike_id,),
         ).fetchone()
 
@@ -134,7 +141,7 @@ def list_all_bikes() -> list[sqlite3.Row]:
     """Restituisce tutte le bici (tutti i campi), ordinate per id."""
     with _get_conn() as conn:
         return conn.execute(
-            "SELECT id, label, status, unlock_code FROM bikes ORDER BY id"
+            "SELECT id, label, status, unlock_code, photo_url FROM bikes ORDER BY id"
         ).fetchall()
 
 
@@ -178,12 +185,12 @@ def get_last_n_bookings(n: int) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def add_bike(label: str, unlock_code: str) -> int:
+def add_bike(label: str, unlock_code: str, photo_url: Optional[str] = None) -> int:
     """Inserisce una nuova bici con status='available'. Restituisce l'id assegnato."""
     with _get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO bikes (label, status, unlock_code) VALUES (?, 'available', ?)",
-            (label, unlock_code),
+            "INSERT INTO bikes (label, status, unlock_code, photo_url) VALUES (?, 'available', ?, ?)",
+            (label, unlock_code, photo_url),
         )
         conn.commit()
         return cur.lastrowid  # type: ignore[return-value]

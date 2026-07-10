@@ -22,3 +22,6 @@ SMTP_FROM: str = os.getenv("SMTP_FROM", "")
 
 # Verifica che le variabili SMTP siano presenti (warn solo a runtime, non al caricamento del modulo)
 SMTP_CONFIGURED: bool = all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM])
+
+# URL del pannello admin
+ADMIN_URL: str = os.getenv("ADMIN_URL", "http://localhost:8001/docs#/")
