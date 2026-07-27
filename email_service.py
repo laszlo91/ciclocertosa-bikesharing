@@ -6,6 +6,7 @@ import secrets
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate
 
 import config
 
@@ -39,6 +40,7 @@ def send_otp(to_email: str, otp_code: str) -> None:
     )
 
     msg = MIMEMultipart("alternative")
+    msg["Date"] = formatdate(localtime=True)
     msg["Subject"] = subject
     msg["From"] = config.SMTP_FROM
     msg["To"] = to_email
@@ -49,14 +51,14 @@ def send_otp(to_email: str, otp_code: str) -> None:
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=ctx, timeout=10) as server:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-                server.sendmail(config.SMTP_FROM, to_email, msg.as_string())
+                server.send_message(msg)
         else:
             with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
                 server.ehlo()
                 server.starttls(context=ssl.create_default_context())
                 server.ehlo()  # RFC 3207 §4: re-issue EHLO dopo STARTTLS
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-                server.sendmail(config.SMTP_FROM, to_email, msg.as_string())
+                server.send_message(msg)
     except smtplib.SMTPException as exc:
         raise EmailError(f"Invio non riuscito: {exc}") from exc
     except OSError as exc:
@@ -92,6 +94,7 @@ def send_booking_confirmation(
     )
 
     msg = MIMEMultipart("alternative")
+    msg["Date"] = formatdate(localtime=True)
     msg["Subject"] = subject
     msg["From"] = config.SMTP_FROM
     msg["To"] = to_email
@@ -102,14 +105,14 @@ def send_booking_confirmation(
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=ctx, timeout=10) as server:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-                server.sendmail(config.SMTP_FROM, to_email, msg.as_string())
+                server.send_message(msg)
         else:
             with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
                 server.ehlo()
                 server.starttls(context=ssl.create_default_context())
                 server.ehlo()
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-                server.sendmail(config.SMTP_FROM, to_email, msg.as_string())
+                server.send_message(msg)
     except smtplib.SMTPException as exc:
         raise EmailError(f"Invio conferma non riuscito: {exc}") from exc
     except OSError as exc:
